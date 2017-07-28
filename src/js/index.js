@@ -93,7 +93,6 @@ class Main {
             modelMatrix.rotate(1, 0, 1, 0);
 
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-debugger
 //left
             mvpMatrix.setArray(frameData.leftProjectionMatrix).multiply(new Matrix4().setArray(frameData.leftViewMatrix)).multiply(modelMatrix);
 
