@@ -20,26 +20,30 @@
 
         #webgl {
             display: block;
+            background-color: #000;
         }
 
         #vr {
             position: absolute;
             bottom: 24px;
             right: 24px;
-            color: #fff;
-            font-size: 24px;
+            padding: 4px 8px;
+            background-color: transparent;
+            border: 2px solid #00aadd;
+            color: #00aadd;
+            font-size: 16px;
             text-align: center;
+            outline: none;
             -webkit-appearance: none;
-            border: none;
         }
     </style>
 </head>
 
 <body onload="new Main(document.getElementById('webgl'))">
     <canvas id="webgl"></canvas>
-    <button id="vr">oo</button>
+    <button id="vr">进入VR</button>
     <script src="../lib/program.js"></script>
-    <script src="../lib/matrix.js"></script>
+    <script src="../lib/gl-matrix.min.js"></script>
     <script src="../js/index.js"></script>
 </body>
 

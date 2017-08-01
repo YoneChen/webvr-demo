@@ -40,14 +40,25 @@ class Main {
         navigator.getVRDisplays().then(displays => {
             this.vrDisplay = displays[0];
             console.log('Display found');
+            if (!this.vrDisplay) return;
             // Starting the presentation when the button is clicked: It can only be called in response to a user gesture
+            let flag = true;
             btn.addEventListener('click', e => {
-                this.vrDisplay.requestPresent([{
-                    source: canvas
-                }]).then( () => {
-                    this.start();
-                    this.render();
-                });
+                if (flag) {
+                    btn.textContent = '退出VR';
+                    this.vrDisplay.requestPresent([{
+                        source: canvas
+                    }]).then( () => {
+                        this.start();
+                        this.render();
+                    });
+                } else {
+                    btn.textContent = '进入VR';
+                    this.vrDisplay.exitPresent();
+                    this.vrDisplay.cancelAnimationFrame(this.vrSceneFrame);
+                    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+                }
+                flag = !flag;
             });
         });
     }
@@ -69,63 +80,55 @@ class Main {
         gl.uniform3f(u_AmbientLight, 0.2, 0.2, 0.2);
 
         const u_LightDirection = gl.getUniformLocation(gl.program, 'u_LightDirection');
-        const lightDirection = new Vector3([0.5, 3.0, 4.0]).normalize();
-        gl.uniform3fv(u_LightDirection, lightDirection.elements);
+        let lightDirection = vec3.create();
+        vec3.normalize(lightDirection,[0.5, 3.0, 4.0]);
+        gl.uniform3fv(u_LightDirection, lightDirection);
 
     }
     render() {
         const {gl,canvas,vrDisplay,frameData,n} = this;
-        // const vpMatrix = new Matrix4();
-        // vpMatrix.setPerspective(30, canvas.width / canvas.height, 1, 100);
-        // vpMatrix.lookAt(3, 3, 7, 0, 0, 0, 0, 1, 0);
 
-        const modelMatrix = new Matrix4();
-        modelMatrix.setTranslate(-3,-3,-7);
-        const mvpMatrix = new Matrix4();
-        const normalMatrix = new Matrix4();
+        let modelMatrix = mat4.create(),
+        vpMatrix = mat4.create(),
+        mvpMatrix = mat4.create(),
+        normalMatrix = mat4.create();
+        mat4.translate(modelMatrix,modelMatrix,[-3,-3,-7]);
 
         const u_MvpMatrix = gl.getUniformLocation(gl.program, 'u_MvpMatrix');
         const u_NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
         let angle = 0.0;
-        const startTime = Date.now();
-        const tick = () => {
+        this.frameId;
+        const animate = () => {
+            this.vrSceneFrame = vrDisplay.requestAnimationFrame(animate);
             vrDisplay.getFrameData(frameData);
-            modelMatrix.rotate(1, 0, 1, 0);
+            mat4.rotate(modelMatrix,modelMatrix,0.1, [0, 1, 0]);
+            mat4.invert(normalMatrix,modelMatrix);
+            mat4.transpose(normalMatrix,normalMatrix);
 
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-//left
-            mvpMatrix.setArray(frameData.leftProjectionMatrix).multiply(new Matrix4().setArray(frameData.leftViewMatrix)).multiply(modelMatrix);
+            gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix);
+            //left
+            mat4.multiply(vpMatrix,frameData.leftProjectionMatrix,frameData.leftViewMatrix);
+            mat4.multiply(mvpMatrix,vpMatrix,modelMatrix);
 
-            normalMatrix.setInverseOf(modelMatrix);
-            normalMatrix.transpose();
-
-            gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix.elements);
-            gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix.elements);
+            gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
 
             gl.viewport(0, 0, canvas.width * 0.5, canvas.height);
             gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
 
-//right
-            mvpMatrix.setArray(frameData.rightProjectionMatrix).multiply(new Matrix4().setArray(frameData.rightViewMatrix)).multiply(modelMatrix);
+            //right
+            mat4.multiply(vpMatrix,frameData.rightProjectionMatrix,frameData.rightViewMatrix);
+            mat4.multiply(mvpMatrix,vpMatrix,modelMatrix);
 
-            normalMatrix.setInverseOf(modelMatrix);
-            normalMatrix.transpose();
-
-            gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix.elements);
-            gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix.elements);
+            gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
 
             gl.viewport(canvas.width * 0.5, 0, canvas.width * 0.5, canvas.height);
             gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
-
-
-            vrDisplay.requestAnimationFrame(tick);
+            
 
         }
-        tick();
+        animate();
 
-    }
-    animate(startTime, currentTime) {
-        return (currentTime - startTime) / 10 % 360;
     }
     initVertexBuffers(gl) {
         // Create a cube
