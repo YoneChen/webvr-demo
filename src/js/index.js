@@ -1,31 +1,20 @@
 const VSHADER_SOURCE =
     `
-attribute vec4 a_Position;
-attribute vec4 a_Color;
-attribute vec4 a_Normal;
+attribute vec3 a_Position;
 uniform mat4 u_MvpMatrix;
-uniform mat4 u_NormalMatrix;
-uniform vec3 u_LightColor;
-uniform vec3 u_AmbientLight;
-uniform vec3 u_LightDirection;
-varying vec4 v_Color;
+attribute vec2 a_TexCoord;
+varying highp vec2 v_TexCoord;
 void main() {
-    vec3 normal = normalize((u_NormalMatrix * a_Normal).xyz);
-    float nDotL = max(dot(u_LightDirection,normal),0.0);
-    vec3 ambient = a_Color.rgb * u_AmbientLight;
-    vec3 diffuse = a_Color.rgb * u_LightColor * nDotL;
-    gl_Position = u_MvpMatrix * a_Position;
-    v_Color = vec4(diffuse + ambient,a_Color.a);
+    gl_Position = u_MvpMatrix * vec4(a_Position,1.0);
+    v_TexCoord = a_TexCoord;
 }
 `;
 const FSHADER_SOURCE =
     `
-#ifdef GL_ES
-precision mediump float;
-#endif
-varying vec4 v_Color;
+uniform sampler2D u_Sampler;
+varying highp vec2 v_TexCoord;
 void main() {
-    gl_FragColor = v_Color;
+    gl_FragColor = texture2D(u_Sampler,v_TexCoord);
 }
 `;
 class Main {
@@ -48,7 +37,7 @@ class Main {
                     btn.textContent = '退出VR';
                     this.vrDisplay.requestPresent([{
                         source: canvas
-                    }]).then( () => {
+                    }]).then(() => {
                         this.start();
                         this.render();
                     });
@@ -63,68 +52,70 @@ class Main {
         });
     }
     start() {
-        const {gl,canvas,vrDisplay} = this;
+        const {
+            gl,
+            canvas,
+            vrDisplay
+        } = this;
         // Initialize shaders
         if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
             console.log('Failed to intialize shaders.');
             return;
         }
         this.n = this.initVertexBuffers(gl);
+        this.initTextures(gl,'../assets/metal003.png');
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clearDepth(1.0); 
         gl.enable(gl.DEPTH_TEST);
-
-        const u_LightColor = gl.getUniformLocation(gl.program, 'u_LightColor');
-        gl.uniform3f(u_LightColor, 1.0, 1.0, 1.0);
-
-        const u_AmbientLight = gl.getUniformLocation(gl.program, 'u_AmbientLight');
-        gl.uniform3f(u_AmbientLight, 0.2, 0.2, 0.2);
-
-        const u_LightDirection = gl.getUniformLocation(gl.program, 'u_LightDirection');
-        let lightDirection = vec3.create();
-        vec3.normalize(lightDirection,[0.5, 3.0, 4.0]);
-        gl.uniform3fv(u_LightDirection, lightDirection);
+        gl.depthFunc(gl.LEQUAL);    
 
     }
     render() {
-        const {gl,canvas,vrDisplay,frameData,n} = this;
+        const {
+            gl,
+            canvas,
+            vrDisplay,
+            frameData,
+            n
+        } = this;
 
         let modelMatrix = mat4.create(),
-        vpMatrix = mat4.create(),
-        mvpMatrix = mat4.create(),
-        normalMatrix = mat4.create();
-        mat4.translate(modelMatrix,modelMatrix,[-3,-3,-7]);
+            vpMatrix = mat4.create(),
+            mvpMatrix = mat4.create();
+        mat4.translate(modelMatrix, modelMatrix, [-3, -3, -7]);
 
         const u_MvpMatrix = gl.getUniformLocation(gl.program, 'u_MvpMatrix');
-        const u_NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
         let angle = 0.0;
         this.frameId;
         const animate = () => {
             this.vrSceneFrame = vrDisplay.requestAnimationFrame(animate);
             vrDisplay.getFrameData(frameData);
-            mat4.rotate(modelMatrix,modelMatrix,0.1, [0, 1, 0]);
-            mat4.invert(normalMatrix,modelMatrix);
-            mat4.transpose(normalMatrix,normalMatrix);
-
+            mat4.rotate(modelMatrix, modelMatrix, 0.1, [0, 1, 0]);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix);
+
+
+            gl.bindTexture(gl.TEXTURE_2D,this.texture);
+        const u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler');
+        gl.uniform1i(u_Sampler,0);
+
             //left
-            mat4.multiply(vpMatrix,frameData.leftProjectionMatrix,frameData.leftViewMatrix);
-            mat4.multiply(mvpMatrix,vpMatrix,modelMatrix);
+            mat4.multiply(vpMatrix, frameData.leftProjectionMatrix, frameData.leftViewMatrix);
+            mat4.multiply(mvpMatrix, vpMatrix, modelMatrix);
 
             gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
 
             gl.viewport(0, 0, canvas.width * 0.5, canvas.height);
-            gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
+            gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
 
             //right
-            mat4.multiply(vpMatrix,frameData.rightProjectionMatrix,frameData.rightViewMatrix);
-            mat4.multiply(mvpMatrix,vpMatrix,modelMatrix);
+            mat4.multiply(vpMatrix, frameData.rightProjectionMatrix, frameData.rightViewMatrix);
+            mat4.multiply(mvpMatrix, vpMatrix, modelMatrix);
 
             gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
 
             gl.viewport(canvas.width * 0.5, 0, canvas.width * 0.5, canvas.height);
-            gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
-            
+            gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
+
 
         }
         animate();
@@ -134,67 +125,125 @@ class Main {
         // Create a cube
         //    v6----- v5
         //   /|      /|
-        //  v1------v0|
+        //  v3------v2|
         //  | |     | |
         //  | |v7---|-|v4
         //  |/      |/
-        //  v2------v3
+        //  v0------v1
 
-        const initVertexBuffer = (gl, attribName, bufferData) => {
+        const initVertexBuffer = (gl, attribName, bufferData,length) => {
             const buffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
             gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.STATIC_DRAW);
             const attribLocation = gl.getAttribLocation(gl.program, attribName);
-            gl.vertexAttribPointer(attribLocation, 3, gl.FLOAT, false, 0, 0);
+            gl.vertexAttribPointer(attribLocation, length, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(attribLocation);
         }
-        const vertices = new Float32Array([ // Vertex coordinates
-            1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, // v0-v1-v2-v3 front
-            1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, // v0-v3-v4-v5 right
-            1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, // v0-v5-v6-v1 up
-            -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, // v1-v6-v7-v2 left
-            -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, // v7-v4-v3-v2 down
-            1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0 // v4-v7-v6-v5 back
+        const vertices = new Float32Array([
+            // Front face
+            -1.0, -1.0, 1.0,
+            1.0, -1.0, 1.0,
+            1.0, 1.0, 1.0,
+            -1.0, 1.0, 1.0,
+
+            // Back face
+            -1.0, -1.0, -1.0,
+            -1.0, 1.0, -1.0,
+            1.0, 1.0, -1.0,
+            1.0, -1.0, -1.0,
+
+            // Top face
+            -1.0, 1.0, -1.0,
+            -1.0, 1.0, 1.0,
+            1.0, 1.0, 1.0,
+            1.0, 1.0, -1.0,
+
+            // Bottom face
+            -1.0, -1.0, -1.0,
+            1.0, -1.0, -1.0,
+            1.0, -1.0, 1.0,
+            -1.0, -1.0, 1.0,
+
+            // Right face
+            1.0, -1.0, -1.0,
+            1.0, 1.0, -1.0,
+            1.0, 1.0, 1.0,
+            1.0, -1.0, 1.0,
+
+            // Left face
+            -1.0, -1.0, -1.0,
+            -1.0, -1.0, 1.0,
+            -1.0, 1.0, 1.0,
+            -1.0, 1.0, -1.0
         ]);
 
         // Colors
-        var colors = new Float32Array([
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, // v0-v1-v2-v3 front
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, // v0-v3-v4-v5 right
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, // v0-v5-v6-v1 up
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, // v1-v6-v7-v2 left
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, // v7-v4-v3-v2 down
-            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9　 // v4-v7-v6-v5 back
+        const textureCoordinates = new Float32Array([
+            // Front
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Back
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Top
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Bottom
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Right
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Left
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0
         ]);
 
-        const indices = new Uint8Array([ // Indices of the vertices
+        const indices = new Uint16Array([
             0, 1, 2, 0, 2, 3, // front
-            4, 5, 6, 4, 6, 7, // right
-            8, 9, 10, 8, 10, 11, // up
-            12, 13, 14, 12, 14, 15, // left
-            16, 17, 18, 16, 18, 19, // down
-            20, 21, 22, 20, 22, 23 // back
-        ]);
-        // Normal
-        const normals = new Float32Array([
-            0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, // v0-v1-v2-v3 front
-            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, // v0-v3-v4-v5 right
-            0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, // v0-v5-v6-v1 up
-            -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, // v1-v6-v7-v2 left
-            0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, // v7-v4-v3-v2 down
-            0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0 // v4-v7-v6-v5 back
+            4, 5, 6, 4, 6, 7, // back
+            8, 9, 10, 8, 10, 11, // top
+            12, 13, 14, 12, 14, 15, // bottom
+            16, 17, 18, 16, 18, 19, // right
+            20, 21, 22, 20, 22, 23 // left
         ]);
 
         // const vertexColorBuffer = gl.createBuffer();
-        initVertexBuffer(gl, 'a_Position', vertices);
-        initVertexBuffer(gl, 'a_Color', colors);
-        initVertexBuffer(gl, 'a_Normal', normals);
-
+        initVertexBuffer(gl, 'a_Position', vertices,3);
+        initVertexBuffer(gl, 'a_TexCoord', textureCoordinates,2);
 
         const indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
         return indices.length;
+    }
+    initTextures(gl,source) {
+        this.texture = gl.createTexture();
+        const image = new Image();
+        image.onload = () => {
+            loadTexture(gl,this.texture,image);
+        }
+        image.src = source;
+        const loadTexture = (gl,texture,image) => {
+        gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D,texture);
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+            gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+        }
     }
 }
