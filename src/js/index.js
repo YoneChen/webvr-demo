@@ -50,8 +50,8 @@ class Main {
                     this.vrDisplay.exitPresent();
                     this.vrDisplay.cancelAnimationFrame(this.vrSceneFrame);
                     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
                 }
                 flag = !flag;
             });
@@ -70,7 +70,7 @@ class Main {
         }
         this.n = this.initVertexBuffers(gl);
         this.initTextures(gl,'../assets/texture.jpg');
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clearColor(0.4, 0.4, 0.4, 1.0);
         gl.clearDepth(1.0); 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);    
