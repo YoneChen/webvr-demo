@@ -34,11 +34,6 @@ class Main {
             btn.addEventListener('click', e => {
                 if (flag) {
                     btn.textContent = '退出VR';
-                const leftEye = this.vrDisplay.getEyeParameters('left');
-                const rightEye = this.vrDisplay.getEyeParameters('right');
-
-                canvas.width = Math.max(leftEye.renderWidth, rightEye.renderWidth) * 2;
-                canvas.height = Math.max(leftEye.renderHeight, rightEye.renderHeight);
                     this.vrDisplay.requestPresent([{
                         source: canvas
                     }]).then(() => {
@@ -50,8 +45,6 @@ class Main {
                     this.vrDisplay.exitPresent();
                     this.vrDisplay.cancelAnimationFrame(this.vrSceneFrame);
                     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-                    canvas.width = window.innerWidth;
-                    canvas.height = window.innerHeight;
                 }
                 flag = !flag;
             });
