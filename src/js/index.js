@@ -62,11 +62,11 @@ class Main {
             return;
         }
         this.n = this.initVertexBuffers(gl);
-        this.initTextures(gl,'../assets/texture.jpg');
+        this.initTextures(gl, '../assets/texture.jpg');
         gl.clearColor(0.4, 0.4, 0.4, 1.0);
-        gl.clearDepth(1.0); 
+        gl.clearDepth(1.0);
         gl.enable(gl.DEPTH_TEST);
-        gl.depthFunc(gl.LEQUAL);    
+        gl.depthFunc(gl.LEQUAL);
 
     }
     render() {
@@ -88,17 +88,17 @@ class Main {
         this.frameId;
         const animate = () => {
             this.vrSceneFrame = vrDisplay.requestAnimationFrame(animate);
-            vrDisplay.getFrameData(frameData);
+            const {
+                leftProjectionMatrix,
+                leftViewMatrix,
+                rightProjectionMatrix,
+                rightViewMatrix
+            } = frameData;
             mat4.rotate(modelMatrix, modelMatrix, 0.02, [0, 1, 0]);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-
-            gl.bindTexture(gl.TEXTURE_2D,this.texture);
-            const u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler');
-            gl.uniform1i(u_Sampler,0);
-
             //left
-            mat4.multiply(vpMatrix, frameData.leftProjectionMatrix, frameData.leftViewMatrix);
+            mat4.multiply(vpMatrix, leftProjectionMatrix, leftViewMatrix);
             mat4.multiply(mvpMatrix, vpMatrix, modelMatrix);
 
             gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
@@ -107,14 +107,15 @@ class Main {
             gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
 
             //right
-            mat4.multiply(vpMatrix, frameData.rightProjectionMatrix, frameData.rightViewMatrix);
+            mat4.multiply(vpMatrix, rightProjectionMatrix, rightViewMatrix);
             mat4.multiply(mvpMatrix, vpMatrix, modelMatrix);
 
             gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
 
             gl.viewport(canvas.width * 0.5, 0, canvas.width * 0.5, canvas.height);
             gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
-            this.vrDisplay.submitFrame();
+            vrDisplay.getFrameData(frameData);
+            vrDisplay.submitFrame();
 
         }
         animate();
@@ -130,7 +131,7 @@ class Main {
         //  |/      |/
         //  *-------*
 
-        const initVertexBuffer = (gl, attribName, bufferData,length) => {
+        const initVertexBuffer = (gl, attribName, bufferData, length) => {
             const buffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
             gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.STATIC_DRAW);
@@ -142,26 +143,22 @@ class Main {
             // Front face
             -1.0, -1.0, 1.0,
             1.0, -1.0, 1.0,
-            1.0, 1.0, 1.0,
-            -1.0, 1.0, 1.0,
+            1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
 
             // Back face
-            -1.0, -1.0, -1.0,
-            -1.0, 1.0, -1.0,
+            -1.0, -1.0, -1.0, -1.0, 1.0, -1.0,
             1.0, 1.0, -1.0,
             1.0, -1.0, -1.0,
 
             // Top face
-            -1.0, 1.0, -1.0,
-            -1.0, 1.0, 1.0,
+            -1.0, 1.0, -1.0, -1.0, 1.0, 1.0,
             1.0, 1.0, 1.0,
             1.0, 1.0, -1.0,
 
             // Bottom face
             -1.0, -1.0, -1.0,
             1.0, -1.0, -1.0,
-            1.0, -1.0, 1.0,
-            -1.0, -1.0, 1.0,
+            1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
 
             // Right face
             1.0, -1.0, -1.0,
@@ -170,10 +167,7 @@ class Main {
             1.0, -1.0, 1.0,
 
             // Left face
-            -1.0, -1.0, -1.0,
-            -1.0, -1.0, 1.0,
-            -1.0, 1.0, 1.0,
-            -1.0, 1.0, -1.0
+            -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0
         ]);
 
         // Colors
@@ -220,8 +214,8 @@ class Main {
         ]);
 
         // const vertexColorBuffer = gl.createBuffer();
-        initVertexBuffer(gl, 'a_Position', vertices,3);
-        initVertexBuffer(gl, 'a_TexCoord', textureCoordinates,2);
+        initVertexBuffer(gl, 'a_Position', vertices, 3);
+        initVertexBuffer(gl, 'a_TexCoord', textureCoordinates, 2);
 
         const indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -229,23 +223,26 @@ class Main {
 
         return indices.length;
     }
-    initTextures(gl,source) {
+    initTextures(gl, source) {
         this.texture = gl.createTexture();
         const image = new Image();
         image.onload = () => {
-            loadTexture(gl,this.texture,image);
+            loadTexture(gl, this.texture, image);
         }
         image.src = source;
-        const loadTexture = (gl,texture,image) => {
-        gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D,texture);
-            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
-// gl.NEAREST is also allowed, instead of gl.LINEAR, as neither mipmap.
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-// Prevents s-coordinate wrapping (repeating).
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-// Prevents t-coordinate wrapping (repeating).
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const loadTexture = (gl, texture, image) => {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            // gl.NEAREST is also allowed, instead of gl.LINEAR, as neither mipmap.
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            // Prevents s-coordinate wrapping (repeating).
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            // Prevents t-coordinate wrapping (repeating).
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.bindTexture(gl.TEXTURE_2D, this.texture);
+            const u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler');
+            gl.uniform1i(u_Sampler, 0);
         }
     }
 }
