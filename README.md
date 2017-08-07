@@ -13,13 +13,11 @@
 | Gear VR       | [Oculus Carmel](https://www.oculus.com/experiences/gear-vr/1290985657630933/) 或 [Samsung Internet](https://www.oculus.com/experiences/gear-vr/849609821813454/)
 | Oculus Rift     |  [Firefox Nightly](https://webvr.rocks/firefox) 或 Chrome 56+
 | HTC Vive     |  [Firefox Nightly](https://webvr.rocks/firefox) 或 Chrome 56+或[Servo](https://blog.mozvr.com/webvr-servo-architecture-and-latency-optimizations/)
-![daydream view](http://upload-images.jianshu.io/upload_images/1939855-cdea08effd465e7c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+![移动VR两大生态](https://pic1.zhimg.com/v2-509fb7c4ce9c4df722920b573aeb5db0_b.png)
 
 遗憾的是，WebVR的体验方式目前只能运行在Android和Windows系统上。不过这并不影响我们在mac和linux上开发与调试。
 
-
-
-![Gear VR 5](http://upload-images.jianshu.io/upload_images/1939855-5a65908a3e75f0e9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 ### WebVR的开发环境配置
 由于WebVR App需要运行VR设备上，而目前购买一台VR设备的成本不低，所以这里我总结了一套开发环境下WebVR调试方案。
